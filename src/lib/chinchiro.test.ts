@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { classifyDice, paymentFor, addResult, EMPTY_STATS, EXPECTED_PAYMENT_RATE, randomDice, type OutcomeId } from './chinchiro';
+import { classifyDice, paymentFor, addResult, EMPTY_STATS, EXPECTED_PAYMENT_RATE, HARSH_TRUTH, HARSH_TRUTH_TABLE, MEGA_VOLUME_NOTE, OUTCOMES, formatCups, formatDecimal, formatFraction, harshTruth, randomDice, recordFromCounts, type OutcomeId } from './chinchiro';
 
 const dice = [1, 2, 3, 4, 5, 6] as const;
 
@@ -78,5 +78,57 @@ describe('会計と集計', () => {
   it('リセット可能な累計を更新する', () => {
     const stats = addResult(EMPTY_STATS, { ...classifyDice(2, 4), dice: [2, 4] }, 500);
     expect(stats).toEqual({ rolls: 1, totalPayment: 250, totalListPrice: 500, counts: { yamada: 0, free: 0, half: 1, double: 0 } });
+  });
+});
+
+describe('残酷な真実', () => {
+  it('定数の表から 7/6、55/36、42/55 を導く', () => {
+    const truth = harshTruth();
+    expect(truth.pay).toEqual({ numerator: 7, denominator: 6 });
+    expect(truth.volume).toEqual({ numerator: 55, denominator: 36 });
+    expect(truth.payPerVolume).toEqual({ numerator: 42, denominator: 55 });
+    expect(formatFraction(truth.pay)).toBe('7/6');
+    expect(formatFraction(truth.volume)).toBe('55/36');
+    expect(formatFraction(truth.payPerVolume)).toBe('42/55');
+    expect(formatDecimal(truth.pay)).toBe('1.17');
+    expect(formatDecimal(truth.volume)).toBe('1.53');
+    expect(formatDecimal(truth.payPerVolume)).toBe('0.76');
+    expect(truth.extraPayPercent).toBe(17);
+    expect(truth.extraVolumePercent).toBe(53);
+    expect(truth.cheaperPercent).toBe(24);
+    expect(truth.summary).toBe('平均すると17%多く払うけど、量は53%増えるので、1杯分あたりは24%安い。ただし飲む量も増える。');
+    expect(HARSH_TRUTH).toEqual(truth);
+    expect(EXPECTED_PAYMENT_RATE).toBeCloseTo(7 / 6);
+    expect(MEGA_VOLUME_NOTE).toBe('メガは通常の2倍量として計算');
+  });
+
+  it('表の組み合わせ数と支払倍率は36通りの判定と一致する', () => {
+    const counts: Record<OutcomeId, number> = { yamada: 0, free: 0, half: 0, double: 0 };
+    for (const a of dice) for (const b of dice) counts[classifyDice(a, b).id] += 1;
+    for (const row of HARSH_TRUTH_TABLE) {
+      expect(counts[row.id]).toBe(row.ways);
+      expect(row.pay.numerator / row.pay.denominator).toBe(OUTCOMES[row.id].multiplier);
+    }
+    expect(HARSH_TRUTH_TABLE.filter(row => row.volume.numerator / row.volume.denominator === 2).map(row => row.id)).toEqual(['yamada', 'double']);
+  });
+
+  it('戦績の杯数は同じ表から理論値と並べられる', () => {
+    const all = recordFromCounts({ yamada: 1, free: 5, half: 12, double: 18 });
+    expect(all.rolls).toBe(36);
+    expect(all.paid).toEqual({ numerator: 42, denominator: 1 });
+    expect(all.volume).toEqual({ numerator: 55, denominator: 1 });
+    expect(all.payPerVolume).toEqual({ numerator: 42, denominator: 55 });
+    expect(all.theoryPaid).toEqual(all.paid);
+    expect(all.theoryVolume).toEqual(all.volume);
+    expect(formatCups(all.paid)).toBe('42杯分');
+
+    const half = recordFromCounts({ yamada: 0, free: 0, half: 1, double: 0 });
+    expect(half.paid).toEqual({ numerator: 1, denominator: 2 });
+    expect(half.volume).toEqual({ numerator: 1, denominator: 1 });
+    expect(formatCups(half.paid)).toBe('0.5杯分');
+    expect(formatCups(half.theoryPaid)).toBe('1.17杯分');
+    expect(formatCups(half.theoryVolume)).toBe('1.53杯分');
+
+    expect(recordFromCounts(EMPTY_STATS.counts).payPerVolume).toBeNull();
   });
 });

@@ -24,6 +24,10 @@ test('連続した戦績・定価変更・再挑戦・リセット・ミュー�
   await page.getByRole('button', { name: 'サイコロを振る！' }).click();
   await expect(page.locator('.result-half')).toBeVisible({ timeout: 15000 });
   await expect(page.locator('.result-card')).toContainText('¥250');
+  await expect(page.locator('.harsh-record')).toContainText('払った額');
+  await expect(page.locator('.harsh-record')).toContainText('0.5杯分');
+  await expect(page.locator('.harsh-record')).toContainText('飲んだ量');
+  await expect(page.locator('.harsh-record')).toContainText('1杯分');
   await page.getByRole('button', { name: 'もう一度、勝負！' }).click();
   await expect(page.locator('.stat').first()).toContainText('2回', { timeout: 15000 });
   await expect(page.locator('.stat').nth(1)).toContainText('¥500');
@@ -80,6 +84,28 @@ test('山田の演出と自由な乱数、キーボード操作', async ({ page 
   await expect(page.locator('.result-card')).toBeVisible({ timeout: 15000 });
   const value = await page.locator('.result-card').getAttribute('class');
   expect(value).toMatch(/result-(yamada|free|half|double)/);
+});
+
+test('残酷な真実の期待値が画面幅に収まる', async ({ page }, testInfo) => {
+  await page.goto('/#rules');
+  const table = page.getByRole('table', { name: '1回あたりの料金と量の期待値' });
+  await expect(table).toBeVisible();
+  await expect(table).toContainText('7/6');
+  await expect(table).toContainText('55/36');
+  await expect(table).toContainText('42/55');
+  await expect(table).toContainText('約1.17倍');
+  await expect(table).toContainText('約1.53倍');
+  await expect(table).toContainText('約0.76倍');
+  await expect(page.getByText('平均すると17%多く払うけど、量は53%増えるので、1杯分あたりは24%安い。ただし飲む量も増える。')).toBeVisible();
+  await expect(page.getByText('メガは通常の2倍量として計算')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '残酷な真実' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const box = await page.locator('.harsh-truth').boundingBox();
+  const viewport = page.viewportSize();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual((viewport?.width ?? 0) + 1);
+  await page.locator('.harsh-truth').screenshot({ path: testInfo.outputPath('harsh-truth.png') });
 });
 
 test('アクセシビリティと画面幅', async ({ page }) => {
