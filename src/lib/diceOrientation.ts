@@ -44,6 +44,41 @@ export function topFaceFromQuaternion(orientation: QuaternionTuple): Die {
   return rotated.reduce((top, face) => face.normal[1] > top.normal[1] ? face : top).value;
 }
 
+function normalizeQuaternion(orientation: QuaternionTuple): QuaternionTuple {
+  const length = Math.hypot(orientation[0], orientation[1], orientation[2], orientation[3]);
+  if (length < 1e-8) return [0, 0, 0, 1];
+  return [orientation[0] / length, orientation[1] / length, orientation[2] / length, orientation[3] / length];
+}
+
+function multiplyQuaternion(a: QuaternionTuple, b: QuaternionTuple): QuaternionTuple {
+  const [ax, ay, az, aw] = a;
+  const [bx, by, bz, bw] = b;
+  return [
+    aw * bx + ax * bw + ay * bz - az * by,
+    aw * by - ax * bz + ay * bw + az * bx,
+    aw * bz + ax * by - ay * bx + az * bw,
+    aw * bw - ax * bx - ay * by - az * bz,
+  ];
+}
+
+/**
+ * Lay a settled die flat without changing which face is up.
+ * The rotation is the shortest arc that takes the current top normal to +Y.
+ */
+export function orientationKeepingTopFace(orientation: QuaternionTuple): { value: Die; orientation: QuaternionTuple } {
+  const value = topFaceFromQuaternion(orientation);
+  const normal = rotate(FACE_NORMALS[value], orientation);
+  const length = Math.hypot(normal[0], normal[1], normal[2]);
+  const up: [number, number, number] = length < 1e-8 ? [0, 1, 0] : [normal[0] / length, normal[1] / length, normal[2] / length];
+  const source = normalizeQuaternion(orientation);
+  if (up[1] > 1 - 1e-6) return { value, orientation: source };
+  const align = rotationFromUnitVectors(up, [0, 1, 0]);
+  let next = normalizeQuaternion(multiplyQuaternion(align, source));
+  const dot = source[0] * next[0] + source[1] * next[1] + source[2] * next[2] + source[3] * next[3];
+  if (dot < 0) next = [-next[0], -next[1], -next[2], -next[3]];
+  return { value, orientation: next };
+}
+
 export function assertRenderedOutcome(dice: [Die, Die], orientations: [QuaternionTuple, QuaternionTuple]) {
   const actual: [Die, Die] = [topFaceFromQuaternion(orientations[0]), topFaceFromQuaternion(orientations[1])];
   if (actual[0] !== dice[0] || actual[1] !== dice[1]) throw new Error(`Rendered top faces ${actual} do not match judged values ${dice}`);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { FACE_NORMALS, FACE_VALUES_BY_AXIS, DIE_CHARACTERS, assertRenderedOutcome, rotate, seededDice, targetOrientation, topFaceFromQuaternion } from './diceOrientation';
+import { FACE_NORMALS, FACE_VALUES_BY_AXIS, DIE_CHARACTERS, assertRenderedOutcome, orientationKeepingTopFace, rotate, seededDice, targetOrientation, topFaceFromQuaternion } from './diceOrientation';
 import type { Die } from './chinchiro';
 
 const near = (v: number[]) => v.map(n => Math.abs(n) < 1e-12 ? 0 : n);
@@ -13,18 +13,51 @@ function topMaterialSlot(orientation: ReturnType<typeof targetOrientation>) {
 
 
 describe('整列アニメーション', () => {
-  it('物理で停止した姿勢を変えず、位置のみを補間する', () => {
-    // The alignment path contains no quaternion, angular velocity, or slerp mutation.
-    // Centering keeps this settled orientation unchanged until the predetermined final top is built.
-    const settled = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3, -0.4, 0.2));
-    const position = new THREE.Vector3(0.3, 0.64, -0.2);
-    const before = settled.clone();
-    const mix = 0.1;
-    position.x += (-0.63 - position.x) * mix * 0.55;
-    position.z += (0.17 - position.z) * mix * 0.55;
-    expect(settled.equals(before)).toBe(true);
-    expect(position.x).toBeCloseTo(0.24885);
-    expect(position.z).toBeCloseTo(-0.17965);
+  function worldTop(orientation: readonly [number, number, number, number], value: Die) {
+    return new THREE.Vector3(...FACE_NORMALS[value]).applyQuaternion(new THREE.Quaternion(...orientation));
+  }
+
+  it('傾いて止まっても上面の目を保ったまま水平に寝かせる', () => {
+    const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.7);
+    const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.25);
+    const tilted = tilt.clone().multiply(yaw);
+    const tuple = tilted.toArray() as [number, number, number, number];
+    const kept = orientationKeepingTopFace(tuple);
+
+    expect(kept.value).toBe(1);
+    expect(topFaceFromQuaternion(kept.orientation)).toBe(1);
+    const top = worldTop(kept.orientation, 1);
+    expect(top.y).toBeGreaterThan(0.999);
+    expect(Math.hypot(top.x, top.z)).toBeLessThan(1e-6);
+
+    const sideBefore = new THREE.Vector3(0, 0, 1).applyQuaternion(yaw);
+    const sideAfter = worldTop(kept.orientation, 2);
+    expect(sideAfter.x).toBeCloseTo(sideBefore.x, 5);
+    expect(sideAfter.z).toBeCloseTo(sideBefore.z, 5);
+  });
+
+  it('先に決めた別の目へは向けない', () => {
+    const settled = targetOrientation(2);
+    const kept = orientationKeepingTopFace(settled);
+    expect(kept.value).toBe(2);
+    expect(topFaceFromQuaternion(targetOrientation(6))).toBe(6);
+    expect(worldTop(kept.orientation, 2).y).toBeGreaterThan(0.999);
+  });
+
+  it('どの傾きでも最も上の面が +Y に残り、補間中も目が変わらない', () => {
+    for (let i = 0; i < 240; i++) {
+      const tilted = new THREE.Quaternion().setFromEuler(new THREE.Euler(i * 0.17, i * 0.31, i * 0.13));
+      const tuple = tilted.toArray() as [number, number, number, number];
+      const kept = orientationKeepingTopFace(tuple);
+      expect(kept.value).toBe(topFaceFromQuaternion(tuple));
+      expect(worldTop(kept.orientation, kept.value).y).toBeGreaterThan(0.999);
+      const from = new THREE.Quaternion(...tuple);
+      const to = new THREE.Quaternion(...kept.orientation);
+      for (let step = 1; step <= 8; step++) {
+        const mid = from.clone().slerp(to, step / 8);
+        expect(topFaceFromQuaternion(mid.toArray() as [number, number, number, number])).toBe(kept.value);
+      }
+    }
   });
 });
 

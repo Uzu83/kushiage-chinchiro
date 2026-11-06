@@ -2,10 +2,10 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import type { Die } from '../lib/chinchiro';
-import { FACE_VALUES_BY_AXIS, assertRenderedOutcome, targetOrientation } from '../lib/diceOrientation';
+import { FACE_VALUES_BY_AXIS, assertRenderedOutcome, orientationKeepingTopFace, targetOrientation } from '../lib/diceOrientation';
 
 export interface DiceSceneHandle {
-  roll: (dice: [Die, Die]) => Promise<void>;
+  roll: (dice: [Die, Die], options?: { lock?: boolean }) => Promise<[Die, Die]>;
 }
 
 interface Props {
@@ -64,10 +64,10 @@ export default forwardRef<DiceSceneHandle, Props>(function DiceScene({ onClack, 
   const callbacks = useRef({ onClack, reducedMotion });
   callbacks.current = { onClack, reducedMotion };
 
-  const engine = useRef<{ roll: (dice: [Die, Die]) => Promise<void> } | null>(null);
+  const engine = useRef<{ roll: (dice: [Die, Die], options?: { lock?: boolean }) => Promise<[Die, Die]> } | null>(null);
 
   useImperativeHandle(ref, () => ({
-    roll: dice => engine.current?.roll(dice) ?? Promise.resolve(),
+    roll: (dice, options) => engine.current?.roll(dice, options) ?? Promise.resolve(dice),
   }), []);
 
   useEffect(() => {
@@ -137,7 +137,6 @@ export default forwardRef<DiceSceneHandle, Props>(function DiceScene({ onClack, 
     const bowlMaterial = new CANNON.Material('bowl');
     world.addContactMaterial(new CANNON.ContactMaterial(diceMaterial, diceMaterial, { friction: 0.24, restitution: 0.48 }));
     world.addContactMaterial(new CANNON.ContactMaterial(diceMaterial, bowlMaterial, { friction: 0.38, restitution: 0.40 }));
-    const defaultOrientation = new THREE.Quaternion();
     const bodies = meshes.map((mesh, index) => {
       const body = new CANNON.Body({ mass: 1, shape: new CANNON.Box(new CANNON.Vec3(HALF, HALF, HALF)), material: diceMaterial, linearDamping: 0.3, angularDamping: 0.25 });
       body.position.set(index === 0 ? -0.63 : 0.63, 0.64, index === 0 ? 0.17 : -0.15);
@@ -163,8 +162,10 @@ export default forwardRef<DiceSceneHandle, Props>(function DiceScene({ onClack, 
     let active = false;
     let elapsed = 0;
     let lastTime = performance.now();
-    let resolveRoll: (() => void) | undefined;
-    const targets: THREE.Quaternion[] = [defaultOrientation, defaultOrientation];
+    let resolveRoll: ((faces: [Die, Die]) => void) | undefined;
+    const settledOrientation = [new THREE.Quaternion(), new THREE.Quaternion()];
+    let settledFaces: [Die, Die] | null = null;
+    let locked = false;
     let judgedValues: [Die, Die] = [1, 1];
     const reduced = () => callbacks.current.reducedMotion;
     let raf = 0;
@@ -172,16 +173,54 @@ export default forwardRef<DiceSceneHandle, Props>(function DiceScene({ onClack, 
     let needsRender = true;
     let cameraEase = 0;
 
+    function publishFaces(faces: [Die, Die]) {
+      const text = faces.join(',');
+      host.current?.setAttribute('data-settled-faces', text);
+      host.current?.setAttribute('data-top-faces', text);
+      host.current?.setAttribute('data-judged-faces', text);
+    }
+
+    function holdFaces(dice: [Die, Die]) {
+      judgedValues = dice;
+      settledFaces = dice;
+      for (let i = 0; i < 2; i++) {
+        const q = targetOrientation(dice[i]);
+        settledOrientation[i].set(...q);
+        const body = bodies[i];
+        body.quaternion.set(...q);
+        body.velocity.setZero();
+        body.angularVelocity.setZero();
+        body.position.set(i === 0 ? -0.63 : 0.63, 0.64, i === 0 ? 0.17 : -0.15);
+      }
+      publishFaces(dice);
+    }
+
+    // The face that is up when the dice stop is the result. Flattening keeps that face up.
+    function captureSettled() {
+      if (settledFaces) return;
+      const faces = [0, 1].map(i => {
+        const body = bodies[i];
+        const kept = orientationKeepingTopFace([body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w]);
+        settledOrientation[i].set(...kept.orientation);
+        body.quaternion.set(...kept.orientation);
+        body.angularVelocity.setZero();
+        return kept.value;
+      }) as [Die, Die];
+      settledFaces = faces;
+      judgedValues = faces;
+      publishFaces(faces);
+    }
+
     function finish() {
       active = false;
+      if (!settledFaces) captureSettled();
+      const faces = settledFaces ?? judgedValues;
       bodies.forEach((body, i) => {
         const x = i === 0 ? -0.63 : 0.63;
         const z = i === 0 ? 0.17 : -0.15;
         body.position.set(x, 0.64, z); body.velocity.setZero(); body.angularVelocity.setZero();
-        body.quaternion.set(targets[i].x, targets[i].y, targets[i].z, targets[i].w);
-        const finalQ = targetOrientation(judgedValues[i]);
-        body.quaternion.set(...finalQ);
-        targets[i].set(...finalQ);
+        const q = settledOrientation[i];
+        body.quaternion.set(q.x, q.y, q.z, q.w);
         body.sleep();
       });
       cameraEase = reduced() ? 1 : 0;
@@ -191,11 +230,11 @@ export default forwardRef<DiceSceneHandle, Props>(function DiceScene({ onClack, 
         mesh.quaternion.copy(bodies[i].quaternion as unknown as THREE.Quaternion);
       });
       meshes.forEach(mesh => mesh.updateMatrixWorld(true));
-      const topFaces = assertRenderedOutcome(judgedValues, meshes.map(mesh => mesh.quaternion.toArray()) as [[number, number, number, number], [number, number, number, number]]);
-      host.current?.setAttribute('data-top-faces', topFaces.join(','));
-      host.current?.setAttribute('data-judged-faces', judgedValues.join(','));
+      const topFaces = assertRenderedOutcome(faces, meshes.map(mesh => mesh.quaternion.toArray()) as [[number, number, number, number], [number, number, number, number]]);
+      judgedValues = topFaces;
+      publishFaces(topFaces);
       needsRender = true;
-      resolveRoll?.(); resolveRoll = undefined;
+      resolveRoll?.(topFaces); resolveRoll = undefined;
     }
 
     function animate(now: number) {
@@ -205,25 +244,23 @@ export default forwardRef<DiceSceneHandle, Props>(function DiceScene({ onClack, 
       if (!documentVisible) return;
       if (active) {
         elapsed += delta;
-        if (!reduced() && elapsed < 1.8) {
+        const centering = locked || reduced() || elapsed >= 1.8;
+        if (!centering) {
           world.step(1 / 60, delta, 3);
         } else if (!reduced()) {
-          // Translation only: preserve the physics-settled orientation while centering.
+          if (!locked) captureSettled();
+          // Slide to the center. Yaw stays as settled; do not turn a new face up.
           const mix = Math.min(1, delta * 12);
           bodies.forEach((body, i) => {
             body.velocity.setZero(); body.angularVelocity.setZero(); body.sleep();
+            const q = settledOrientation[i];
+            body.quaternion.set(q.x, q.y, q.z, q.w);
             const x = body.position.x;
             const z = body.position.z;
             const nextX = x + ((i === 0 ? -0.63 : 0.63) - x) * mix * 0.55;
             const nextZ = z + ((i === 0 ? 0.17 : -0.15) - z) * mix * 0.55;
             const safe = Math.min(1, 1.25 / Math.max(0.0001, Math.hypot(nextX, nextZ)));
             body.position.set(nextX * safe, 0.64, nextZ * safe);
-          });
-        } else {
-          bodies.forEach((body, i) => {
-            const q = new THREE.Quaternion(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w);
-            q.slerp(targets[i], 0.28);
-            body.quaternion.set(q.x, q.y, q.z, q.w);
           });
         }
         if (elapsed >= (reduced() ? 0.38 : 2.8)) finish();
@@ -260,24 +297,26 @@ export default forwardRef<DiceSceneHandle, Props>(function DiceScene({ onClack, 
     document.addEventListener('visibilitychange', onVisibility);
 
     engine.current = {
-      roll: dice => {
-        if (active) return Promise.resolve();
+      roll: (dice, options) => {
+        if (active) return Promise.resolve(settledFaces ?? dice);
         active = true; elapsed = 0; needsRender = true; cameraEase = reduced() ? 1 : 0;
         camera.position.copy(wideCamera); camera.lookAt(lookTarget);
-        judgedValues = dice;
-        meshes.forEach((_, i) => {
-          const q = targetOrientation(dice[i]);
-          targets[i].set(...q);
-        });
-        bodies.forEach((body, i) => {
-          body.wakeUp();
-          if (reduced()) { body.position.set(i === 0 ? -0.63 : 0.63, 0.64, i === 0 ? 0.17 : -0.15); return; }
-          body.position.set(i === 0 ? -0.8 : 0.8, 3.0 + Math.random() * 0.6, (Math.random() - 0.5) * 0.7);
-          body.quaternion.setFromEuler(Math.random() * 5, Math.random() * 5, Math.random() * 5);
-          body.velocity.set((i === 0 ? 1 : -1) * 1.1, 1.0, (Math.random() - 0.5) * 2);
-          body.angularVelocity.set(8 + Math.random() * 6, 9 + Math.random() * 6, 7 + Math.random() * 6);
-        });
-        return new Promise<void>(resolve => {
+        locked = Boolean(options?.lock);
+        settledFaces = null;
+        host.current?.removeAttribute('data-settled-faces');
+        host.current?.removeAttribute('data-top-faces');
+        host.current?.removeAttribute('data-judged-faces');
+        if (locked) holdFaces(dice);
+        else {
+          bodies.forEach((body, i) => {
+            body.wakeUp();
+            body.position.set(i === 0 ? -0.8 : 0.8, 3.0 + Math.random() * 0.6, (Math.random() - 0.5) * 0.7);
+            body.quaternion.setFromEuler(Math.random() * 5, Math.random() * 5, Math.random() * 5);
+            body.velocity.set((i === 0 ? 1 : -1) * 1.1, 1.0, (Math.random() - 0.5) * 2);
+            body.angularVelocity.set(8 + Math.random() * 6, 9 + Math.random() * 6, 7 + Math.random() * 6);
+          });
+        }
+        return new Promise<[Die, Die]>(resolve => {
           resolveRoll = resolve;
         });
       },
@@ -286,7 +325,7 @@ export default forwardRef<DiceSceneHandle, Props>(function DiceScene({ onClack, 
     return () => {
       cancelAnimationFrame(raf); observer.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
-      engine.current = null; resolveRoll?.();
+      engine.current = null; resolveRoll?.(settledFaces ?? [1, 1]);
       meshes.forEach(mesh => {
         mesh.geometry.dispose();
         (mesh.material as THREE.MeshStandardMaterial[]).forEach(m => { m.map?.dispose(); m.dispose(); });

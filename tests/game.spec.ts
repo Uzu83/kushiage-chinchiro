@@ -98,4 +98,44 @@ test('動きを抑える設定でも操作できる', async ({ page }) => {
   await expect(page.locator('.dice-scene canvas')).toBeVisible();
   await page.getByRole('button', { name: 'サイコロを振る！' }).click();
   await expect(page.locator('.result-card')).toContainText('1杯無料');
+  await expect(page.locator('.dice-scene')).toHaveAttribute('data-settled-faces', '6,6');
+  await expect(page.locator('.dice-scene')).toHaveAttribute('data-top-faces', '6,6');
+  await expect(page.locator('.dice-scene')).toHaveAttribute('data-judged-faces', '6,6');
+});
+
+test('止まった上面が結果まで変わらず、結果カードと一致する', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.dice-scene canvas')).toBeVisible();
+  await page.getByRole('button', { name: 'サイコロを振る！' }).click();
+  const scene = page.locator('.dice-scene');
+  await expect(scene).toHaveAttribute('data-settled-faces', /^[1-6],[1-6]$/, { timeout: 15000 });
+  const settled = (await scene.getAttribute('data-settled-faces')) ?? '';
+  const samples = await page.evaluate(async () => {
+    const el = document.querySelector('.dice-scene');
+    if (!el) return [];
+    const seen = new Set();
+    const read = () => {
+      const value = el.getAttribute('data-top-faces');
+      if (value) seen.add(value);
+    };
+    read();
+    await new Promise(resolve => {
+      const timer = window.setInterval(() => {
+        read();
+        if (document.querySelector('.result-card')) {
+          window.clearInterval(timer);
+          resolve(undefined);
+        }
+      }, 40);
+    });
+    read();
+    return [...seen];
+  });
+  expect(samples).toEqual([settled]);
+  await expect(scene).toHaveAttribute('data-top-faces', settled);
+  await expect(scene).toHaveAttribute('data-judged-faces', settled);
+  const [left, right] = settled.split(',').map(Number);
+  const label = (value: number, side: 'left' | 'right') => (value === 1 ? (side === 'left' ? '山' : '田') : String(value));
+  const readout = (await page.locator('.dice-readout').innerText()).replace(/\s+/g, '');
+  expect(readout).toContain(`${label(left, 'left')}×${label(right, 'right')}`);
 });

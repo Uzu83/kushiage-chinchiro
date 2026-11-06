@@ -3,7 +3,7 @@ import { ArrowUpRight, Check, ChevronDown, CircleHelp, Github, Hand, RotateCcw, 
 import type { DiceSceneHandle } from './components/DiceScene';
 const DiceScene = lazy(() => import('./components/DiceScene'));
 import { DieIcon, Effects, MegaJockey } from './components/Effects';
-import { addResult, EMPTY_STATS, OUTCOMES, paymentFor, randomDice, roll, type Die, type OutcomeId, type RollResult, type Stats } from './lib/chinchiro';
+import { addResult, EMPTY_STATS, OUTCOMES, paymentFor, roll, type Die, type OutcomeId, type RollResult, type Stats } from './lib/chinchiro';
 import { SoundEngine } from './lib/audio';
 
 type TestRoll = OutcomeId | null;
@@ -88,10 +88,11 @@ function App() {
     await sound.current?.unlock();
     const testParam = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('force') as TestRoll : null;
     const forced = forcedDice(testParam);
-    const dice = forced ?? randomDice();
-    const next = roll(dice);
+    const lock = reducedMotion || Boolean(forced);
+    const dice: [Die, Die] = forced ?? [1, 1];
     sound.current?.play('throw');
-    await scene.current?.roll(dice);
+    const settled = (await scene.current?.roll(dice, { lock })) ?? dice;
+    const next = roll(settled);
     timeout.current = setTimeout(() => {
       setResult(next); setStats(previous => addResult(previous, next, price));
       setSequence(previous => previous + 1); setEffect(next.id); setRolling(false);
