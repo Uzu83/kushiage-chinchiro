@@ -3,11 +3,16 @@ import { ArrowUpRight, Check, ChevronDown, CircleHelp, Github, Hand, RotateCcw, 
 import type { DiceSceneHandle } from './components/DiceScene';
 const DiceScene = lazy(() => import('./components/DiceScene'));
 import { DieIcon, Effects, MegaJockey } from './components/Effects';
-import { addResult, EMPTY_STATS, OUTCOMES, paymentFor, roll, type Die, type OutcomeId, type RollResult, type Stats } from './lib/chinchiro';
+import { addResult, EMPTY_STATS, formatCups, formatDecimal, formatFraction, HARSH_TRUTH, MEGA_VOLUME_NOTE, OUTCOMES, paymentFor, recordFromCounts, roll, type Die, type OutcomeId, type RollResult, type Stats } from './lib/chinchiro';
 import { SoundEngine } from './lib/audio';
 
 type TestRoll = OutcomeId | null;
 const yekanji = (n: number) => n.toLocaleString('ja-JP');
+const TRUTH_ROWS = [
+  { label: '料金の期待値', fraction: HARSH_TRUTH.pay },
+  { label: '量の期待値', fraction: HARSH_TRUTH.volume },
+  { label: '量あたりの料金', fraction: HARSH_TRUTH.payPerVolume },
+] as const;
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -38,6 +43,7 @@ function App() {
   const [priceInput, setPriceInput] = useState('500');
   const price = Math.max(0, Math.min(999999, Number(priceInput) || 0));
   const [stats, setStats] = useState<Stats>(EMPTY_STATS);
+  const record = recordFromCounts(stats.counts);
   const [sequence, setSequence] = useState(0);
   const [showRules, setShowRules] = useState(false);
   const [resetConfirm, setResetConfirm] = useState(false);
@@ -211,6 +217,43 @@ function App() {
             <article className="rule-card half"><div className="rule-probability">約33.3<span>%</span><small>12 / 36</small></div><div className="rule-dice pips"><span>⚂</span><span>⚂</span></div><div className="rule-copy"><p className="rule-tag">ゾロ目以外</p><h3>合計が偶数</h3><p>通常ジョッキ<br /><strong>半額</strong></p></div></article>
             <article className="rule-card double"><div className="rule-probability">50<span>%</span><small>18 / 36</small></div><div className="rule-dice pips"><span>⚀</span><span>⚁</span></div><div className="rule-copy"><p className="rule-tag">残念</p><h3>合計が奇数</h3><p>メガジョッキ<br /><strong>倍量・倍額</strong></p></div></article>
           </div>
+          <section className="harsh-truth" aria-labelledby="harsh-title">
+            <h3 id="harsh-title">残酷な真実</h3>
+            <p className="harsh-lead">1回振るたびに、定価を1としたときの料金と、通常ジョッキを1としたときの量です。実際の金額は出していません。</p>
+            <div className="harsh-table-wrap" tabIndex={0} role="region" aria-labelledby="harsh-caption">
+              <table className="harsh-table">
+                <caption id="harsh-caption">1回あたりの料金と量の期待値</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">項目</th>
+                    <th scope="col">分数</th>
+                    <th scope="col">小数</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {TRUTH_ROWS.map(row => (
+                    <tr key={row.label}>
+                      <th scope="row">{row.label}</th>
+                      <td>{formatFraction(row.fraction)}</td>
+                      <td>約{formatDecimal(row.fraction)}倍</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="harsh-summary">{HARSH_TRUTH.summary}</p>
+            <p className="harsh-note">※{MEGA_VOLUME_NOTE}</p>
+            {record.rolls > 0 && record.payPerVolume && (
+              <div className="harsh-record">
+                <p>あなたの合計（この画面だけ。端末の外には送りません）</p>
+                <dl>
+                  <div><dt>払った額</dt><dd>{formatCups(record.paid)}<small>理論 {formatCups(record.theoryPaid)}</small></dd></div>
+                  <div><dt>飲んだ量</dt><dd>{formatCups(record.volume)}<small>理論 {formatCups(record.theoryVolume)}</small></dd></div>
+                  <div><dt>量あたり</dt><dd>約{formatDecimal(record.payPerVolume)}倍<small>理論 約{formatDecimal(HARSH_TRUTH.payPerVolume)}倍</small></dd></div>
+                </dl>
+              </div>
+            )}
+          </section>
           <details className="rule-details" open={showRules} onToggle={event => setShowRules(event.currentTarget.open)}>
             <summary><span><CircleHelp size={17} /> 判定の優先順位と、ちょっと残酷な真実</span><ChevronDown size={18} /></summary>
             <div className="detail-content"><p>「山田」→「2〜6のゾロ目」→「偶数」→「奇数」の順で判定。山田以外のゾロ目は、合計が偶数でも「1杯無料」です。</p><div className="math-note"><span>知ってた？</span><p>支払額の期待値は定価の<strong>約1.17倍（7/6）</strong>。つい振りたくなるチンチロだけど、夢中になりすぎにはご注意を。</p></div></div>
