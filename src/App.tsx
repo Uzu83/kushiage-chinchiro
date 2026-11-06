@@ -147,6 +147,15 @@ function App() {
 
             {!result && !rolling && <div className="scene-caption"><span className="tap-icon"><Hand size={16} /></span> 下のボタンを押して！</div>}
             {rolling && <div className="rolling-status" role="status"><span className="loading-dots"><i /><i /><i /></span> 出目は…？</div>}
+          </div>
+          <div className="game-controls">
+            <button id="roll-button" className="roll-button" onClick={startRoll} disabled={rolling || priceInput === '' || !sceneReady}>
+              {rolling ? <span className="button-dice"><DieIcon /></span> : <DieIcon />}
+              <span>{rolling ? 'ゴロゴロゴロ…' : result ? 'もう一度、勝負！' : 'サイコロを振る！'}</span>
+              {!rolling && <span className="button-shine" />}
+            </button>
+            <p className="roll-hint"><span className="desktop-hint"><kbd>SPACE</kbd> でも振れます</span><span>{shakeSupported ? 'スマホを振ってもOK' : 'タップで何度でも'}</span></p>
+          </div>
             {result && (
               <div className={`result-card result-${result.id}`} key={`${sequence}-${result.id}`}>
                 {result.id === 'yamada' && <div className="jackpot-rays" />}
@@ -164,16 +173,7 @@ function App() {
                 <p className="result-message">{result.id === 'yamada' ? '最高の引き！今日はついてる！' : result.id === 'free' ? 'ツイてる！おいしい1杯をどうぞ。' : result.id === 'half' ? '半額は半額。素直にうれしい。' : 'サイコロとは、そういうものです…。'}</p>
               </div>
             )}
-          </div>
-
-          <div className="game-controls">
-            <button id="roll-button" className="roll-button" onClick={startRoll} disabled={rolling || priceInput === '' || !sceneReady}>
-              {rolling ? <span className="button-dice"><DieIcon /></span> : <DieIcon />}
-              <span>{rolling ? 'ゴロゴロゴロ…' : result ? 'もう一度、勝負！' : 'サイコロを振る！'}</span>
-              {!rolling && <span className="button-shine" />}
-            </button>
-            <p className="roll-hint"><span className="desktop-hint"><kbd>SPACE</kbd> でも振れます</span><span>{shakeSupported ? 'スマホを振ってもOK' : 'タップで何度でも'}</span></p>
-          </div>
+          {result && <p className="result-caption">上面の出目で判定しています</p>}
           <div className="price-setting">
             <label htmlFor="list-price">定価</label><div className="price-input"><span>¥</span><input id="list-price" inputMode="numeric" type="text" pattern="[0-9]*" maxLength={6} value={priceInput} onChange={e => onPriceChange(e.target.value)} aria-describedby="price-help" /></div><span id="price-help">の1杯で勝負 <span className="price-note">※金額は自由に設定</span></span>
           </div>

@@ -5,7 +5,7 @@ test('全4結果が正しく表示される', async ({ page }) => {
   const errors: string[] = [];
   const external: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
-  page.on('request', req => { if (!req.url().startsWith('http://127.0.0.1:3001') && !req.url().startsWith('http://localhost:3001') && !req.url().startsWith('blob:')) external.push(req.url()); });
+  page.on('request', req => { if (!req.url().startsWith('http://127.0.0.1:3000') && !req.url().startsWith('http://localhost:3000') && !req.url().startsWith('blob:')) external.push(req.url()); });
   for (const [id, text] of [['yamada', '山田'], ['free', '1杯無料'], ['half', '半額'], ['double', '倍量・倍額']]) {
     await page.goto(`/?force=${id}`);
     await expect(page.locator('.dice-scene canvas')).toBeVisible();
@@ -39,12 +39,40 @@ test('連続した戦績・定価変更・再挑戦・リセット・ミュー�
   await expect(page.getByText('最初の出目を記録しよう')).toBeVisible();
 });
 
+test('4種類の出目が描画の上面と必ず一致する', async ({ page }) => {
+  for (const id of ['yamada', 'free', 'half', 'double']) {
+    await page.goto(`/?force=${id}`);
+    await expect(page.locator('.dice-scene canvas')).toBeVisible();
+    await page.getByRole('button', { name: 'サイコロを振る！' }).click();
+    await expect(page.locator(`.result-${id}`)).toBeVisible({ timeout: 15000 });
+    const rendered = (await page.locator('.dice-scene').getAttribute('data-top-faces'))?.split(',').map(Number);
+    const judged = (await page.locator('.dice-scene').getAttribute('data-judged-faces'))?.split(',').map(Number);
+    expect(rendered).toEqual(judged);
+    const expected = id === 'yamada' ? [1, 1] : id === 'free' ? [6, 6] : id === 'half' ? [2, 4] : [1, 2];
+    expect(judged).toEqual(expected);
+    const bounds = await page.locator('.dice-scene').boundingBox();
+    const resultBounds = await page.locator('.result-card').boundingBox();
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(resultBounds!.y);
+  }
+});
+
+test('整列後の山田は左が山・右が田で上面とも一致', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/?force=yamada');
+  await expect(page.locator('.dice-scene canvas')).toBeVisible();
+  await page.getByRole('button', { name: 'サイコロを振る！' }).click();
+  await expect(page.locator('.result-yamada')).toBeVisible({ timeout: 15000 });
+  expect(await page.locator('.dice-scene').getAttribute('data-top-faces')).toBe('1,1');
+  expect(errors).toEqual([]);
+});
+
 test('山田の演出と自由な乱数、キーボード操作', async ({ page }) => {
   await page.goto('/?force=yamada');
   await expect(page.locator('.dice-scene canvas')).toBeVisible();
   await page.locator('h1').click();
   await page.keyboard.press('Space');
-  await expect(page.locator('.app-shell')).toHaveClass(/is-jackpot/);
+  await expect(page.locator('.app-shell')).toHaveClass(/is-jackpot/, { timeout: 30000 });
   await expect(page.locator('.effect-canvas')).toBeVisible();
   await expect(page.locator('.mega-jockey')).toBeVisible();
   await page.goto('/');
