@@ -1,6 +1,6 @@
 # 串揚げチンチロシミュレーター
 
-![シミュレーターのプレビュー](shots/mobile-preview.png)
+![シミュレーターのプレビュー](shots/final-mobile-home.png)
 
 **今日の運勢、丼に託せ。** 丼の中で3Dのサイコロが跳ねて、出目に応じたジョッキの会計を表示する、非公式の運試しWebアプリです。
 
@@ -67,7 +67,7 @@ npm run dev
 ```sh
 npm run test       # 判定と全36通りの確率、会計・集計の単体テスト
 npm run test:e2e   # Playwright: 4結果、連続操作、スマホ、アクセシビリティ
-npx playwright install chromium # 初回のみ
+npx playwright install chromium # 初回のみ（npm install後、テスト前に実行）
 ```
 
 E2EはモバイルとデスクトップのChromiumで実行します。`@axe-core/playwright` によるWCAG 2 A / AAとWCAG 2.1 AAの自動検査も含みます。
@@ -88,8 +88,8 @@ npm run preview
 - Three.js: MIT License / Copyright © three.js authors
 - cannon-es: MIT License / Copyright © Stefan Hedman
 - Icons: Lucide, ISC License
-- 本文フォント: Zen Kaku Gothic New, SIL Open Font License 1.1
-- 表示フォント: Dela Gothic One, SIL Open Font License 1.1。必要文字のみのサブセットを同梱
+- 本文フォント: Zen Kaku Gothic New（派生フォント名: Zen Kaku Gothic New Local）, SIL Open Font License 1.1
+- 表示フォント: Dela Gothic One, SIL Open Font License 1.1。必要文字のみのサブセットを、Dela Gothic Local（Dela Gothic One派生）として同梱
 - 効果音・3Dモデル・紙吹雪・ジョッキはこのプロジェクト内で生成しており、外部素材はありません。
 
 フォントのライセンスは `THIRD_PARTY_NOTICES.md` にまとめています。

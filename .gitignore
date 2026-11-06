@@ -1,9 +1,10 @@
+
 node_modules/
 dist/
 .vercel/
 playwright-report/
 test-results/
-*/LICENSE
 shots/*.mp4
-.DS_Store
-
+shots/*.webm
+shots/live-temp/
+*.tsbuildinfo

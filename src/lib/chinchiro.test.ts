@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { classifyDice, paymentFor, addResult, EMPTY_STATS, EXPECTED_PAYMENT_RATE, type OutcomeId } from './chinchiro';
+import { describe, expect, it, vi } from 'vitest';
+import { classifyDice, paymentFor, addResult, EMPTY_STATS, EXPECTED_PAYMENT_RATE, randomDice, type OutcomeId } from './chinchiro';
 
 const dice = [1, 2, 3, 4, 5, 6] as const;
 
@@ -51,6 +51,19 @@ describe('全36通りの確率', () => {
     const total = enumeration.reduce((sum, x) => sum + x.outcome.multiplier, 0);
     expect(total / 36).toBeCloseTo(EXPECTED_PAYMENT_RATE);
     expect(EXPECTED_PAYMENT_RATE).toBeCloseTo(1.1666667);
+  });
+});
+
+describe('乱数', () => {
+  it('偏りのない範囲から1〜6を返す', () => {
+    const values = [251, 255, 251];
+    const spy = vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(<T extends ArrayBufferView | null>(array: T): T => {
+      if (array) (array as Uint8Array)[0] = values.shift() ?? 0;
+      return array;
+    });
+    expect(randomDice()).toEqual([6, 6]);
+    expect(spy).toHaveBeenCalledTimes(3);
+    spy.mockRestore();
   });
 });
 

@@ -68,10 +68,11 @@ function createDie(character: '山' | '田') {
   return die;
 }
 
-export const DiceScene = forwardRef<DiceSceneHandle, Props>(function DiceScene({ onClack, reducedMotion }, ref) {
+export default forwardRef<DiceSceneHandle, Props>(function DiceScene({ onClack, reducedMotion }, ref) {
   const host = useRef<HTMLDivElement>(null);
   const callbacks = useRef({ onClack, reducedMotion });
   callbacks.current = { onClack, reducedMotion };
+
   const engine = useRef<{ roll: (dice: [Die, Die]) => Promise<void> } | null>(null);
 
   useImperativeHandle(ref, () => ({
@@ -120,7 +121,7 @@ export const DiceScene = forwardRef<DiceSceneHandle, Props>(function DiceScene({
     ].map(([x, y]) => new THREE.Vector2(x, y));
     const bowl = new THREE.Mesh(new THREE.LatheGeometry(profile, 96), new THREE.MeshPhysicalMaterial({
       color: '#993523', roughness: 0.25, metalness: 0.02, clearcoat: 0.9, clearcoatRoughness: 0.2,
-      side: THREE.DoubleSide,
+      side: THREE.DoubleSide, forceSinglePass: true,
     }));
     bowl.castShadow = true; bowl.receiveShadow = true; scene.add(bowl);
     const innerProfile = [[0, 0.095], [1.45, 0.095], [1.87, 0.26], [2.27, 0.66], [2.62, 1.19]].map(([x, y]) => new THREE.Vector2(x, y));
@@ -132,6 +133,7 @@ export const DiceScene = forwardRef<DiceSceneHandle, Props>(function DiceScene({
     foot.position.y = -0.18; foot.castShadow = true; scene.add(foot);
 
     const meshes = [createDie('山'), createDie('田')];
+    document.body.dataset.sceneReady = 'true';
     scene.add(...meshes);
 
     const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -16, 0) });

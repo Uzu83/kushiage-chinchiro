@@ -20,6 +20,7 @@ test('全4結果が正しく表示される', async ({ page }) => {
 
 test('連続した戦績・定価変更・再挑戦・リセット・ミュート', async ({ page }) => {
   await page.goto('/?force=half');
+  await expect(page.locator('.dice-scene canvas')).toBeVisible();
   await page.getByRole('button', { name: 'サイコロを振る！' }).click();
   await expect(page.locator('.result-half')).toBeVisible({ timeout: 15000 });
   await expect(page.locator('.result-card')).toContainText('¥250');
@@ -40,6 +41,7 @@ test('連続した戦績・定価変更・再挑戦・リセット・ミュー�
 
 test('山田の演出と自由な乱数、キーボード操作', async ({ page }) => {
   await page.goto('/?force=yamada');
+  await expect(page.locator('.dice-scene canvas')).toBeVisible();
   await page.locator('h1').click();
   await page.keyboard.press('Space');
   await expect(page.locator('.app-shell')).toHaveClass(/is-jackpot/);
@@ -65,6 +67,7 @@ test('アクセシビリティと画面幅', async ({ page }) => {
 test('動きを抑える設定でも操作できる', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/?force=free');
+  await expect(page.locator('.dice-scene canvas')).toBeVisible();
   await page.getByRole('button', { name: 'サイコロを振る！' }).click();
   await expect(page.locator('.result-card')).toContainText('1杯無料');
 });

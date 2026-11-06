@@ -6,7 +6,7 @@ Runtime dependencies are distributed under the following terms. Full dependency 
 
 Copyright 2022 The Zen Project Authors (https://github.com/googlefonts/zen-kakugothic)
 
-SIL Open Font License, Version 1.1. Bundled unmodified via `@fontsource/zen-kaku-gothic-new`. See [the full license](public/fonts/ZenKakuGothicNew-OFL.txt) and [source repository](https://github.com/googlefonts/zen-kakugothic).
+SIL Open Font License, Version 1.1. A Japanese/Latin character subset is bundled as `Zen Kaku Gothic New Local`, based on the upstream `@fontsource/zen-kaku-gothic-new` files. Outlines are unchanged; only covered glyphs and the modified font family name differ. See [the full license](public/fonts/ZenKakuGothicNew-OFL.txt) and [source repository](https://github.com/googlefonts/zen-kakugothic).
 
 ## Dela Gothic One
 

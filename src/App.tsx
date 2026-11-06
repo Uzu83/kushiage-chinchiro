@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { ArrowUpRight, Check, ChevronDown, CircleHelp, Github, Hand, RotateCcw, Volume2, VolumeX } from 'lucide-react';
-import { DiceScene, type DiceSceneHandle } from './components/DiceScene';
+import type { DiceSceneHandle } from './components/DiceScene';
+const DiceScene = lazy(() => import('./components/DiceScene'));
 import { DieIcon, Effects, MegaJockey } from './components/Effects';
 import { addResult, EMPTY_STATS, OUTCOMES, paymentFor, randomDice, roll, type Die, type OutcomeId, type RollResult, type Stats } from './lib/chinchiro';
 import { SoundEngine } from './lib/audio';
@@ -32,6 +33,7 @@ function App() {
   const reducedMotion = useReducedMotion();
   const [muted, setMuted] = useState(false);
   const [rolling, setRolling] = useState(false);
+  const [sceneReady, setSceneReady] = useState(false);
   const [result, setResult] = useState<RollResult | null>(null);
   const [priceInput, setPriceInput] = useState('500');
   const price = Math.max(0, Math.min(999999, Number(priceInput) || 0));
@@ -72,10 +74,16 @@ function App() {
     return () => window.removeEventListener('devicemotion', onMotion);
   }, [shakeSupported]);
 
+  useEffect(() => {
+    const start = () => setSceneReady(true);
+    const timer = setTimeout(start, 1100);
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => () => { if (timeout.current) clearTimeout(timeout.current); }, []);
 
   async function startRoll() {
-    if (rolling) return;
+    if (rolling || !sceneReady) return;
     setRolling(true); setResult(null); setEffect(null); setResetConfirm(false); setNotification('');
     await sound.current?.unlock();
     const testParam = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('force') as TestRoll : null;
@@ -107,7 +115,7 @@ function App() {
     <div className={`app-shell ${rolling ? 'is-rolling' : ''} ${result?.id === 'yamada' ? 'is-jackpot' : ''} ${result ? 'has-result' : ''}`}>
       <a className="skip-link" href="#roll-button">サイコロを振るボタンへ進む</a>
       <header className="site-header">
-        <a className="brand" href="#" aria-label="串揚げチンチロシミュレーター">
+        <a className="brand" href="#">
           <span className="brand-mark"><DieIcon /></span>
           <span className="brand-name">串揚げチンチロ<span>シミュレーター</span></span>
         </a>
@@ -134,7 +142,8 @@ function App() {
           </div>
           <div className="scene-wrap">
             <span className="orbit orbit-1" /><span className="orbit orbit-2" />
-            <DiceScene ref={scene} onClack={() => sound.current?.play('clack')} reducedMotion={reducedMotion} />
+            {sceneReady && <Suspense fallback={<div className="dice-loading" aria-label="3Dの丼を準備中"><span>山</span><span>田</span></div>}><DiceScene ref={scene} onClack={() => sound.current?.play('clack')} reducedMotion={reducedMotion} /></Suspense>}
+            {!sceneReady && <div className="dice-loading" aria-label="3Dの丼を準備中"><span>山</span><span>田</span></div>}
 
             {!result && !rolling && <div className="scene-caption"><span className="tap-icon"><Hand size={16} /></span> 下のボタンを押して！</div>}
             {rolling && <div className="rolling-status" role="status"><span className="loading-dots"><i /><i /><i /></span> 出目は…？</div>}
@@ -158,7 +167,7 @@ function App() {
           </div>
 
           <div className="game-controls">
-            <button id="roll-button" className="roll-button" onClick={startRoll} disabled={rolling || priceInput === ''}>
+            <button id="roll-button" className="roll-button" onClick={startRoll} disabled={rolling || priceInput === '' || !sceneReady}>
               {rolling ? <span className="button-dice"><DieIcon /></span> : <DieIcon />}
               <span>{rolling ? 'ゴロゴロゴロ…' : result ? 'もう一度、勝負！' : 'サイコロを振る！'}</span>
               {!rolling && <span className="button-shine" />}
