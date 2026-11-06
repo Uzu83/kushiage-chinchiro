@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import { FACE_NORMALS, FACE_VALUES_BY_AXIS, DIE_CHARACTERS, assertRenderedOutcome, rotate, seededDice, targetOrientation, topFaceFromQuaternion } from './diceOrientation';
 import type { Die } from './chinchiro';
 
@@ -9,6 +10,23 @@ function topMaterialSlot(orientation: ReturnType<typeof targetOrientation>) {
   const slot = normals.reduce((best, current, index) => rotate(current, orientation)[1] > rotate(normals[best], orientation)[1] ? index : best, 0);
   return slot;
 }
+
+
+describe('整列アニメーション', () => {
+  it('物理で停止した姿勢を変えず、位置のみを補間する', () => {
+    // The alignment path contains no quaternion, angular velocity, or slerp mutation.
+    // Centering keeps this settled orientation unchanged until the predetermined final top is built.
+    const settled = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3, -0.4, 0.2));
+    const position = new THREE.Vector3(0.3, 0.64, -0.2);
+    const before = settled.clone();
+    const mix = 0.1;
+    position.x += (-0.63 - position.x) * mix * 0.55;
+    position.z += (0.17 - position.z) * mix * 0.55;
+    expect(settled.equals(before)).toBe(true);
+    expect(position.x).toBeCloseTo(0.24885);
+    expect(position.z).toBeCloseTo(-0.17965);
+  });
+});
 
 describe('骰子の最終上面と判定', () => {
   it('6つの材面・法線・数が同じ順序', () => {

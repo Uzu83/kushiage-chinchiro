@@ -179,7 +179,6 @@ export default forwardRef<DiceSceneHandle, Props>(function DiceScene({ onClack, 
         const z = i === 0 ? 0.17 : -0.15;
         body.position.set(x, 0.64, z); body.velocity.setZero(); body.angularVelocity.setZero();
         body.quaternion.set(targets[i].x, targets[i].y, targets[i].z, targets[i].w);
-        // Re-hydrate each target from the rigorously tested face mapping in case physics mutated it.
         const finalQ = targetOrientation(judgedValues[i]);
         body.quaternion.set(...finalQ);
         targets[i].set(...finalQ);
@@ -209,11 +208,10 @@ export default forwardRef<DiceSceneHandle, Props>(function DiceScene({ onClack, 
         if (!reduced() && elapsed < 1.8) {
           world.step(1 / 60, delta, 3);
         } else if (!reduced()) {
-          // Freeze the rigid roll before alignment: never tumble during centering.
+          // Translation only: preserve the physics-settled orientation while centering.
           const mix = Math.min(1, delta * 12);
           bodies.forEach((body, i) => {
             body.velocity.setZero(); body.angularVelocity.setZero(); body.sleep();
-            body.quaternion.set(targets[i].x, targets[i].y, targets[i].z, targets[i].w);
             const x = body.position.x;
             const z = body.position.z;
             const nextX = x + ((i === 0 ? -0.63 : 0.63) - x) * mix * 0.55;
