@@ -12,6 +12,7 @@
     "lighthouse": "lighthouse http://127.0.0.1:4173 --only-categories=performance,accessibility,best-practices,seo --output=json --output-path=shots/lighthouse-mobile.json --chrome-flags='--headless --no-sandbox --disable-gpu'"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "cannon-es": "^0.20.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
