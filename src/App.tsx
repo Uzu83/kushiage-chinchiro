@@ -220,9 +220,9 @@ function App() {
 
       <footer>
         <div className="footer-brand"><DieIcon /><span>串揚げチンチロシミュレーター</span></div>
-        <p className="disclaimer">当サイトは非公式のファンメイドシミュレーターです。実在する店舗・企業とは一切関係ありません。<br />実際のルール・提供内容・対象メニューは、各店舗の案内を優先してください。</p>
+        <p className="disclaimer">当サイトは非公式のファンメイドシミュレーターです。実在する店舗・企業とは一切関係ありません。<br />実際のルール・提供内容・対象メニューは、各店舗の案内を優先してください。<br />匿名のアクセス集計を行います。</p>
         <div className="age-notice"><span>20</span><strong>お酒は20歳になってから。</strong><small>飲酒運転は、法律で禁止されています。</small></div>
-        <div className="footer-bottom"><span>COOKIES · ADS · TRACKING <strong>NONE</strong></span><a href="https://github.com/Uzu83/kushiage-chinchiro" target="_blank" rel="noreferrer"><Github size={16} /> OSS / MIT <ArrowUpRight size={14} /></a></div>
+        <div className="footer-bottom"><span>COOKIES · ADS <strong>NONE</strong></span><a href="https://github.com/Uzu83/kushiage-chinchiro" target="_blank" rel="noreferrer"><Github size={16} /> OSS / MIT <ArrowUpRight size={14} /></a></div>
       </footer>
       <Effects outcome={effect} sequence={sequence} reduced={reducedMotion} />
     </div>
